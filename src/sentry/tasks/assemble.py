@@ -793,6 +793,8 @@ class ArtifactBundlePostAssembler:
                     artifact_count=self.archive.artifact_count,
                     # By default, a bundle is not indexed.
                     indexing_state=ArtifactBundleIndexingState.NOT_INDEXED.value,
+                    # Like the debug-ID rows, this is only written for a new bundle.
+                    has_debug_ids=self.archive.has_debug_ids(),
                     # "date_added" and "date_uploaded" will have the same value, but they will diverge once renewal is
                     # performed by other parts of Sentry. Renewal is required since we want to expire unused bundles
                     # after ~90 days.
