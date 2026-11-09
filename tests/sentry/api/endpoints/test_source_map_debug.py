@@ -302,6 +302,7 @@ class SourceMapDebugEndpointTestCase(APITestCase):
             organization_id=self.organization.id,
             file=File.objects.create(name="artifact-bundle.zip", type="dummy.file"),
             artifact_count=1,
+            has_debug_ids=True,
         )
 
         DebugIdArtifactBundle.objects.create(
@@ -349,6 +350,7 @@ class SourceMapDebugEndpointTestCase(APITestCase):
             organization_id=self.organization.id,
             file=File.objects.create(name="artifact-bundle.zip", type="dummy.file"),
             artifact_count=1,
+            has_debug_ids=with_debug_id,
         )
 
         if with_debug_id:
@@ -428,8 +430,9 @@ class SourceMapDebugEndpointTestCase(APITestCase):
 
         assert not resp.data["has_uploaded_some_artifact_with_a_debug_id"]
 
-    @override_options({"sourcemaps.source-map-debug.debug-id-check-max-bundles": 2})
-    def test_project_has_some_artifact_bundle_with_a_debug_id_reads_project_bundles(self) -> None:
+    def test_project_has_some_artifact_bundle_with_a_debug_id_does_not_read_debug_ids(
+        self,
+    ) -> None:
         self.create_project_artifact_bundle(self.project.id, with_debug_id=False)
 
         event = self.store_event(
@@ -437,25 +440,29 @@ class SourceMapDebugEndpointTestCase(APITestCase):
             project_id=self.project.id,
         )
 
-        with CaptureQueriesContext(
-            connections[router.db_for_read(DebugIdArtifactBundle)]
-        ) as queries:
-            resp = self.get_success_response(
-                self.organization.slug,
-                self.project.slug,
-                event.event_id,
-            )
+        for max_bundles in (0, 2):
+            with (
+                self.subTest(max_bundles=max_bundles),
+                override_options(
+                    {"sourcemaps.source-map-debug.debug-id-check-max-bundles": max_bundles}
+                ),
+                CaptureQueriesContext(
+                    connections[router.db_for_read(DebugIdArtifactBundle)]
+                ) as queries,
+            ):
+                resp = self.get_success_response(
+                    self.organization.slug,
+                    self.project.slug,
+                    event.event_id,
+                )
 
-        assert not resp.data["has_uploaded_some_artifact_with_a_debug_id"]
-        # The organization's debug-ID rows aren't read, only those of the project's bundles.
-        debug_id_queries = [
-            query["sql"]
-            for query in queries.captured_queries
-            if 'FROM "sentry_debugidartifactbundle"' in query["sql"]
-        ]
-        assert len(debug_id_queries) == 1
-        assert '"sentry_debugidartifactbundle"."organization_id"' not in debug_id_queries[0]
-        assert '"sentry_debugidartifactbundle"."artifact_bundle_id" IN' in debug_id_queries[0]
+                assert not resp.data["has_uploaded_some_artifact_with_a_debug_id"]
+                # The bundles' `has_debug_ids` answers it, without reading any debug-ID rows.
+                assert not [
+                    query["sql"]
+                    for query in queries.captured_queries
+                    if '"sentry_debugidartifactbundle"' in query["sql"]
+                ]
 
     def test_multiple_exceptions(self) -> None:
         event = self.store_event(

@@ -1246,8 +1246,8 @@ register(
 )
 # When none of an event's debug IDs were uploaded, the source map debugger checks whether the
 # project has uploaded any file with a debug ID. With this set, it only checks the project's
-# newest bundles, up to this many, instead of reading the organization's debug-ID rows until one
-# is in a bundle of the project. 0 keeps the unbounded check. Capped at 10,000.
+# newest bundles, up to this many, instead of all of them. 0 keeps the unbounded check. Capped at
+# 10,000.
 register(
     "sourcemaps.source-map-debug.debug-id-check-max-bundles",
     type=Int,

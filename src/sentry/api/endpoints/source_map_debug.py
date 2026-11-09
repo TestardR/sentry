@@ -3,7 +3,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 import sentry_sdk
-from django.db.models import Exists, OuterRef
 from django.utils.encoding import force_bytes, force_str
 from drf_spectacular.utils import extend_schema
 from packaging.version import Version
@@ -965,30 +964,18 @@ def project_has_some_artifact_with_a_debug_id(project: Project) -> bool:
     """
     Whether any artifact bundle of the project contains a file with a debug ID.
 
-    Without `sourcemaps.source-map-debug.debug-id-check-max-bundles`, this reads the
-    organization's debug-ID rows until one of them is in a bundle of the project, which for a
-    project without any means all of them. With it, only the project's newest bundles are
-    checked, so a project whose debug IDs are all in older bundles counts as having none.
+    Without `sourcemaps.source-map-debug.debug-id-check-max-bundles`, this checks all bundles of
+    the project. With it, only the project's newest bundles are checked, so a project whose debug
+    IDs are all in older bundles counts as having none.
     """
     max_bundles = min(
         options.get("sourcemaps.source-map-debug.debug-id-check-max-bundles"),
         DEBUG_ID_CHECK_MAX_BUNDLES_LIMIT,
     )
     if max_bundles <= 0:
-        return (
-            DebugIdArtifactBundle.objects.filter(
-                organization_id=project.organization_id,
-            )
-            .filter(
-                Exists(
-                    ProjectArtifactBundle.objects.filter(
-                        artifact_bundle_id=OuterRef("artifact_bundle_id"),
-                        project_id=project.id,
-                    )
-                )
-            )
-            .exists()
-        )
+        return ProjectArtifactBundle.objects.filter(
+            project_id=project.id, artifact_bundle__has_debug_ids=True
+        ).exists()
 
     # Bundle ids follow upload order, so this reads the `(project_id, artifact_bundle_id)` index
     # backwards and stops after `max_bundles` rows.
@@ -997,8 +984,7 @@ def project_has_some_artifact_with_a_debug_id(project: Project) -> bool:
         .order_by("-artifact_bundle_id")
         .values_list("artifact_bundle_id", flat=True)[:max_bundles]
     )
-    # One lookup per bundle in the debug-ID rows' `artifact_bundle_id` index.
-    return DebugIdArtifactBundle.objects.filter(artifact_bundle_id__in=newest_bundle_ids).exists()
+    return ArtifactBundle.objects.filter(id__in=newest_bundle_ids, has_debug_ids=True).exists()
 
 
 def get_sdk_debug_id_support(
