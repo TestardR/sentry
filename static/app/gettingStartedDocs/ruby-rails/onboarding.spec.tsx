@@ -57,16 +57,32 @@ describe('rails onboarding docs', () => {
     ).toBeInTheDocument();
   });
 
-  it('enables logs by setting enable_logs to true', () => {
+  it('forwards Ruby logger logs when logs are selected', () => {
     renderWithOnboardingLayout(docs, {
       selectedProducts: [ProductSolution.ERROR_MONITORING, ProductSolution.LOGS],
     });
 
     expect(
-      screen.getByText(textWithMarkupMatcher(/config.enable_logs = true/))
+      screen.getByText(textWithMarkupMatcher(/config.enabled_patches << :logger/))
     ).toBeInTheDocument();
     expect(
-      screen.getByText(textWithMarkupMatcher(/config.enabled_patches = \[:logger\]/))
+      screen.getByText(
+        textWithMarkupMatcher(/config.rails.structured_logging.enabled = true/)
+      )
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(textWithMarkupMatcher(/config.enable_logs/))
+    ).not.toBeInTheDocument();
+  });
+
+  it('configures data collection instead of send_default_pii', () => {
+    renderWithOnboardingLayout(docs);
+
+    expect(
+      screen.getByText(textWithMarkupMatcher(/config.data_collection.user_info = true/))
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(textWithMarkupMatcher(/config.send_default_pii/))
+    ).not.toBeInTheDocument();
   });
 });

@@ -18,16 +18,20 @@ Sentry.init do |config|
   config.dsn = '${params.dsn.public}'
   config.breadcrumbs_logger = [:active_support_logger, :http_logger]
 
-  # Add data like request headers and IP for users,
-  # see https://docs.sentry.io/platforms/ruby/data-management/data-collected/ for more info
-  config.send_default_pii = true${
+  # Add data like the user's IP address and request bodies,
+  # see https://docs.sentry.io/platforms/ruby/configuration/options/#data_collection for more info
+  config.data_collection.user_info = true
+  config.data_collection.http_bodies = [:incoming_request, :outgoing_request]${
     params.isLogsSelected
       ? `
 
-  # Enable sending logs to Sentry
-  config.enable_logs = true
-  # Patch Ruby logger to forward logs
-  config.enabled_patches = [:logger]`
+  # Logs are sent to Sentry by default.
+  # Patch Ruby logger to forward its logs as well
+  config.enabled_patches << :logger
+
+  # Send Rails framework events, like ActiveRecord queries
+  # and controller actions, as logs
+  config.rails.structured_logging.enabled = true`
       : ''
   }${
     params.isPerformanceSelected
@@ -36,15 +40,12 @@ Sentry.init do |config|
   # Set traces_sample_rate to 1.0 to capture 100%
   # of transactions for tracing.
   # We recommend adjusting this value in production.
-  config.traces_sample_rate = 1.0
-  # or
-  config.traces_sampler = lambda do |context|
-    true
-  end`
+  config.traces_sample_rate = 1.0`
       : ''
   }${
     params.isProfilingSelected
       ? `
+
   # Set profiles_sample_rate to profile 100%
   # of sampled transactions.
   # We recommend adjusting this value in production.
