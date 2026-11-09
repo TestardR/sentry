@@ -76,6 +76,9 @@ class ArtifactBundle(Model):
     indexing_state = models.IntegerField(
         default=None, null=True, choices=ArtifactBundleIndexingState.choices()
     )
+    # Whether the bundle has any `DebugIdArtifactBundle` rows, so that checking if a project uploaded any
+    # file with a debug ID doesn't need to read the organization's debug-ID rows.
+    has_debug_ids = models.BooleanField(db_default=False)
     # This field represents the date in which the bundle was renewed, since we have a renewal mechanism in place. The
     # name is the same across entities connected to this bundle named *ArtifactBundle.
     date_added = models.DateTimeField(default=timezone.now, db_index=True)
